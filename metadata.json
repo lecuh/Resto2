@@ -1,0 +1,9 @@
+
+{
+  "name": "RestoManager Pro",
+  "description": "A comprehensive restaurant management system featuring role-based dashboards for Admin, Staff, Kitchen, Cashier, and Customers, enhanced with Gemini AI for smart ordering and table reservations.",
+  "requestFramePermissions": [
+    "camera",
+    "microphone"
+  ]
+}

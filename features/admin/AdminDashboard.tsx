@@ -1,0 +1,628 @@
+
+import React, { useState } from 'react';
+import { MenuItem, OrderStatus, InventoryItem, OrderItem } from '../../types';
+
+type AdminTab = 'OPERATIONS' | 'MENU' | 'INVENTORY' | 'REPORTS' | 'STAFF';
+
+interface InventoryModalState {
+  type: 'IMPORT' | 'ADJUST' | 'ADD' | null;
+  item: InventoryItem | null;
+}
+
+const AdminDashboard: React.FC<{ store: any }> = ({ store }) => {
+  const [activeTab, setActiveTab] = useState<AdminTab>('OPERATIONS');
+  
+  // UI States
+  const [menuSearch, setMenuSearch] = useState('');
+  const [inventorySearch, setInventorySearch] = useState('');
+  
+  // Menu Modals
+  const [isMenuModalOpen, setIsMenuModalOpen] = useState(false);
+  const [editingMenuItem, setEditingMenuItem] = useState<MenuItem | null>(null);
+  
+  // Inventory Modals
+  const [invModal, setInvModal] = useState<InventoryModalState>({ type: null, item: null });
+  const [activeInventoryId, setActiveInventoryId] = useState<string | null>(null);
+
+  // Manual Order States
+  const [isManualOrderOpen, setIsManualOrderOpen] = useState(false);
+  const [manualCart, setManualCart] = useState<OrderItem[]>([]);
+  const [selectedTable, setSelectedTable] = useState('1');
+
+  const navItems = [
+    { id: 'OPERATIONS', label: 'Dashboard', icon: 'dashboard' },
+    { id: 'MENU', label: 'Menu', icon: 'menu_book' },
+    { id: 'INVENTORY', label: 'Inventory', icon: 'inventory' },
+    { id: 'REPORTS', label: 'Reports', icon: 'analytics' },
+    { id: 'STAFF', label: 'Staff', icon: 'group' },
+  ];
+
+  // Manual Ordering Logic
+  const addToManualCart = (item: MenuItem) => {
+    setManualCart(prev => {
+      const existing = prev.find(i => i.menuItemId === item.id);
+      if (existing) {
+        return prev.map(i => i.menuItemId === item.id ? { ...i, quantity: i.quantity + 1 } : i);
+      }
+      return [...prev, { id: Math.random().toString(), menuItemId: item.id, name: item.name, price: item.price, quantity: 1 }];
+    });
+  };
+
+  const submitManualOrder = () => {
+    if (manualCart.length === 0) return;
+    const total = manualCart.reduce((acc, i) => acc + (i.price * i.quantity), 0);
+    store.addOrder({
+      id: Math.floor(1000 + Math.random() * 9000).toString(),
+      tableId: selectedTable,
+      items: manualCart,
+      status: OrderStatus.PENDING,
+      total,
+      createdAt: new Date().toISOString(),
+      waiterName: store.user?.fullName
+    });
+    setManualCart([]);
+    setIsManualOrderOpen(false);
+  };
+
+  // Menu Form Logic
+  const handleMenuSubmit = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    const item: MenuItem = {
+      id: editingMenuItem?.id || Math.random().toString(),
+      name: formData.get('name') as string,
+      price: parseFloat(formData.get('price') as string),
+      category: formData.get('category') as string,
+      description: formData.get('description') as string,
+      image: editingMenuItem?.image || `https://picsum.photos/seed/${Math.random()}/400/300`,
+      available: true
+    };
+
+    if (editingMenuItem) store.updateMenuItem(item);
+    else store.addMenuItem(item);
+    
+    setIsMenuModalOpen(false);
+    setEditingMenuItem(null);
+  };
+
+  // Inventory Logic
+  const handleInventoryAction = (e: React.FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    const formData = new FormData(e.currentTarget);
+    
+    if (invModal.type === 'ADD') {
+      const stockVal = parseFloat(formData.get('stock') as string);
+      let status: 'CRITICAL' | 'LOW' | 'HEALTHY' = 'HEALTHY';
+      if (stockVal < 2) status = 'CRITICAL';
+      else if (stockVal < 5) status = 'LOW';
+
+      const newItem: InventoryItem = {
+        id: `inv-${Math.random().toString(36).substr(2, 9)}`,
+        name: formData.get('name') as string,
+        category: formData.get('category') as string,
+        unit: formData.get('unit') as string,
+        stock: stockVal,
+        status: status
+      };
+      store.addInventoryItem(newItem);
+    } else if (invModal.type === 'IMPORT') {
+      const item = invModal.item;
+      if (!item) return;
+      const amount = parseFloat(formData.get('amount') as string);
+      store.updateInventoryStock(item.id, amount);
+    } else if (invModal.type === 'ADJUST') {
+      const item = invModal.item;
+      if (!item) return;
+      const adjusted: InventoryItem = {
+        ...item,
+        name: formData.get('name') as string,
+        category: formData.get('category') as string,
+        unit: formData.get('unit') as string,
+      };
+      store.adjustInventoryItem(adjusted);
+    }
+
+    setInvModal({ type: null, item: null });
+  };
+
+  const renderOperations = () => (
+    <div className="space-y-8 animate-in fade-in duration-500">
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+        <div className="bg-white border border-gray-100 p-6 rounded-2xl shadow-sm">
+          <div className="flex justify-between items-start mb-4">
+            <div className="p-3 bg-burgundy/5 text-burgundy rounded-xl"><span className="material-symbols-outlined">payments</span></div>
+            <span className="text-xs font-bold text-olive bg-olive/10 px-2 py-1 rounded-full">+12.5%</span>
+          </div>
+          <p className="text-gray-500 text-sm font-medium">Daily Revenue</p>
+          <h3 className="text-2xl font-extrabold text-dark-gray mt-1">$4,850.00</h3>
+        </div>
+        <div className="bg-white border border-gray-100 p-6 rounded-2xl shadow-sm">
+          <div className="flex justify-between items-start mb-4">
+            <div className="p-3 bg-burgundy/5 text-burgundy rounded-xl"><span className="material-symbols-outlined">shopping_cart</span></div>
+          </div>
+          <p className="text-gray-500 text-sm font-medium">Active Orders</p>
+          <h3 className="text-2xl font-extrabold text-dark-gray mt-1">{store.orders.length}</h3>
+        </div>
+        <div className="bg-white border border-gray-100 p-6 rounded-2xl shadow-sm">
+          <div className="flex justify-between items-start mb-4">
+            <div className="p-3 bg-burgundy/5 text-burgundy rounded-xl"><span className="material-symbols-outlined">event_seat</span></div>
+            <span className="text-xs font-bold text-olive bg-olive/10 px-2 py-1 rounded-full">82%</span>
+          </div>
+          <p className="text-gray-500 text-sm font-medium">Occupancy</p>
+          <div className="w-full bg-gray-100 h-1.5 rounded-full mt-3 overflow-hidden"><div className="bg-olive h-full w-[82%]"></div></div>
+        </div>
+        <div className="bg-white border border-gray-100 p-6 rounded-2xl shadow-sm">
+          <div className="flex justify-between items-start mb-4">
+            <div className="p-3 bg-burgundy/5 text-burgundy rounded-xl"><span className="material-symbols-outlined">avg_time</span></div>
+          </div>
+          <p className="text-gray-500 text-sm font-medium">Prep Time</p>
+          <h3 className="text-2xl font-extrabold text-dark-gray mt-1">18m</h3>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+        <div className="xl:col-span-2 space-y-8">
+          <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
+            <div className="p-6 border-b border-gray-50 flex justify-between items-center">
+              <h3 className="text-lg font-bold">Revenue Trends</h3>
+              <button className="text-sm font-bold text-burgundy hover:underline">View Detailed</button>
+            </div>
+            <div className="p-6">
+              <div className="h-64 w-full bg-gray-50 rounded-xl flex items-end gap-2 p-4">
+                {[40, 60, 45, 90, 80, 55, 75].map((h, i) => (
+                  <div key={i} className="flex-1 bg-burgundy/20 hover:bg-burgundy transition-colors rounded-t-lg" style={{ height: `${h}%` }}></div>
+                ))}
+              </div>
+            </div>
+          </div>
+        </div>
+        
+        <div className="space-y-6">
+           <button 
+             onClick={() => setIsManualOrderOpen(true)}
+             className="w-full bg-cheese hover:bg-orange-600 text-white p-6 rounded-2xl flex flex-col items-center gap-2 shadow-lg transition-all active:scale-95"
+           >
+             <span className="material-symbols-outlined text-4xl">add_circle</span>
+             <span className="text-lg font-black uppercase tracking-tight">Manual Order</span>
+           </button>
+           <div className="bg-white border border-gray-100 rounded-2xl shadow-sm p-6">
+             <h3 className="text-lg font-bold mb-6">Inventory Alerts</h3>
+             <div className="space-y-4">
+                {store.inventory.filter((i: InventoryItem) => i.status !== 'HEALTHY').slice(0, 3).map((item: InventoryItem) => (
+                  <div key={item.id} className={`p-4 border rounded-xl flex justify-between items-center ${item.status === 'CRITICAL' ? 'bg-red-50 border-red-100' : 'bg-orange-50 border-orange-100'}`}>
+                    <div>
+                      <p className={`text-sm font-bold ${item.status === 'CRITICAL' ? 'text-red-900' : 'text-orange-900'}`}>{item.name}</p>
+                      <p className="text-xs text-gray-500">{item.stock} {item.unit}</p>
+                    </div>
+                    <button 
+                      onClick={() => setInvModal({ type: 'IMPORT', item })}
+                      className={`px-3 py-1.5 text-white text-[10px] font-black rounded-lg uppercase ${item.status === 'CRITICAL' ? 'bg-red-900' : 'bg-orange-900'}`}
+                    >
+                      Refill
+                    </button>
+                  </div>
+                ))}
+             </div>
+           </div>
+        </div>
+      </div>
+    </div>
+  );
+
+  const renderMenu = () => (
+    <div className="animate-in fade-in duration-500">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
+        <div>
+          <h3 className="text-2xl font-black text-dark-gray uppercase tracking-tight">Menu Management</h3>
+          <p className="text-gray-500 text-sm">Organize and update your restaurant dishes.</p>
+        </div>
+        <div className="flex gap-4 w-full md:w-auto">
+          <div className="relative flex-1 md:w-64">
+            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400">search</span>
+            <input 
+              className="w-full pl-10 pr-4 py-2.5 bg-white border border-gray-200 rounded-xl text-sm"
+              placeholder="Search dishes..."
+              value={menuSearch}
+              onChange={e => setMenuSearch(e.target.value)}
+            />
+          </div>
+          <button 
+            onClick={() => { setEditingMenuItem(null); setIsMenuModalOpen(true); }}
+            className="bg-burgundy text-white px-6 py-2.5 rounded-xl font-bold flex items-center gap-2 shadow-lg"
+          >
+            <span className="material-symbols-outlined">add</span>
+            New Item
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+        {store.menu
+          .filter((item: MenuItem) => item.name.toLowerCase().includes(menuSearch.toLowerCase()))
+          .map((item: MenuItem) => (
+            <div key={item.id} className="bg-white border border-gray-100 rounded-2xl overflow-hidden shadow-sm group hover:shadow-md transition-all">
+              <div className="h-48 bg-cover bg-center relative" style={{ backgroundImage: `url(${item.image})` }}>
+                <div className="absolute inset-0 bg-black/10 group-hover:bg-black/30 transition-all"></div>
+                <div className="absolute top-4 right-4 flex gap-2">
+                  <button 
+                    onClick={() => { setEditingMenuItem(item); setIsMenuModalOpen(true); }}
+                    className="size-8 bg-white/90 backdrop-blur rounded-lg flex items-center justify-center text-dark-gray hover:bg-white transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-sm">edit</span>
+                  </button>
+                  <button 
+                    onClick={() => { if(confirm(`Delete ${item.name}?`)) store.deleteMenuItem(item.id); }}
+                    className="size-8 bg-white/90 backdrop-blur rounded-lg flex items-center justify-center text-red-600 hover:bg-white transition-colors"
+                  >
+                    <span className="material-symbols-outlined text-sm">delete</span>
+                  </button>
+                </div>
+              </div>
+              <div className="p-5">
+                <div className="flex justify-between items-start mb-2">
+                  <h4 className="font-bold text-dark-gray">{item.name}</h4>
+                  <span className="text-burgundy font-black">${item.price}</span>
+                </div>
+                <p className="text-xs text-gray-500 line-clamp-2 mb-4">{item.description}</p>
+                <div className="flex items-center justify-between pt-4 border-t border-gray-50">
+                  <span className="text-[10px] font-black uppercase text-gray-400 tracking-widest">{item.category}</span>
+                  <div className="flex items-center gap-2">
+                    <button 
+                      onClick={() => store.updateMenuItem({ ...item, available: !item.available })}
+                      className={`w-10 h-5 rounded-full relative transition-colors ${item.available ? 'bg-olive' : 'bg-gray-200'}`}
+                    >
+                      <div className={`absolute top-0.5 size-4 bg-white rounded-full transition-all ${item.available ? 'left-5.5' : 'left-0.5'}`}></div>
+                    </button>
+                  </div>
+                </div>
+              </div>
+            </div>
+          ))}
+      </div>
+    </div>
+  );
+
+  const renderInventory = () => (
+    <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden animate-in fade-in duration-500">
+      <div className="p-8 border-b border-gray-50 flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+        <div>
+          <h3 className="text-2xl font-black text-dark-gray uppercase tracking-tight">Inventory Control</h3>
+          <p className="text-gray-500 text-sm">Monitor ingredients and equipment stock.</p>
+        </div>
+        <div className="flex gap-4 w-full md:w-auto">
+          <div className="relative flex-1 md:w-64">
+            <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-[20px]">search</span>
+            <input 
+              className="w-full pl-10 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-sm" 
+              placeholder="Search stock..." 
+              value={inventorySearch}
+              onChange={e => setInventorySearch(e.target.value)}
+            />
+          </div>
+          <button 
+            onClick={() => setInvModal({ type: 'ADD', item: null })}
+            className="bg-burgundy text-white px-5 py-2.5 rounded-xl font-bold flex items-center gap-2 shadow-lg"
+          >
+            <span className="material-symbols-outlined">add</span>
+            New Item
+          </button>
+        </div>
+      </div>
+      <div className="p-0 overflow-x-auto min-h-[400px]">
+        <table className="w-full text-left">
+          <thead className="bg-gray-50/50 text-[11px] font-black text-gray-400 uppercase tracking-widest border-b border-gray-100">
+            <tr>
+              <th className="px-8 py-5">Material</th>
+              <th className="px-8 py-5">Type</th>
+              <th className="px-8 py-5">Level</th>
+              <th className="px-8 py-5">Status</th>
+              <th className="px-8 py-5 text-right">Action</th>
+            </tr>
+          </thead>
+          <tbody className="divide-y divide-gray-50">
+            {store.inventory
+              .filter((i: InventoryItem) => i.name.toLowerCase().includes(inventorySearch.toLowerCase()))
+              .map((row: InventoryItem) => (
+              <tr key={row.id} className="hover:bg-gray-50/50 transition-colors">
+                <td className="px-8 py-5 font-bold text-dark-gray">{row.name}</td>
+                <td className="px-8 py-5 text-gray-500 text-sm">{row.category}</td>
+                <td className="px-8 py-5 font-mono text-sm">{row.stock} {row.unit}</td>
+                <td className="px-8 py-5">
+                  <span className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${
+                    row.status === 'CRITICAL' ? 'text-red-600 bg-red-50' : 
+                    row.status === 'LOW' ? 'text-orange-600 bg-orange-50' : 'text-olive bg-olive/10'
+                  }`}>
+                    {row.status}
+                  </span>
+                </td>
+                <td className="px-8 py-5 text-right relative">
+                  <button 
+                    onClick={() => setActiveInventoryId(activeInventoryId === row.id ? null : row.id)}
+                    className="p-2 hover:bg-gray-100 rounded-lg text-gray-400"
+                  >
+                    <span className="material-symbols-outlined">more_horiz</span>
+                  </button>
+                  {activeInventoryId === row.id && (
+                    <div className="absolute right-8 top-12 bg-white border border-gray-200 rounded-xl shadow-2xl z-50 py-2 w-48 text-left animate-in fade-in zoom-in duration-200">
+                      <button 
+                        onClick={() => { setInvModal({ type: 'IMPORT', item: row }); setActiveInventoryId(null); }}
+                        className="w-full px-4 py-3 hover:bg-gray-50 flex items-center gap-3 text-sm font-bold"
+                      >
+                        <span className="material-symbols-outlined text-[18px] text-burgundy">add_box</span> Import Stock
+                      </button>
+                      <button 
+                        onClick={() => { setInvModal({ type: 'ADJUST', item: row }); setActiveInventoryId(null); }}
+                        className="w-full px-4 py-3 hover:bg-gray-50 flex items-center gap-3 text-sm font-bold"
+                      >
+                        <span className="material-symbols-outlined text-[18px] text-cheese">settings</span> Adjust Specs
+                      </button>
+                      <div className="border-t border-gray-100 my-1"></div>
+                      <button 
+                        onClick={() => { if(confirm('Remove this item?')) store.removeInventoryItem(row.id); setActiveInventoryId(null); }}
+                        className="w-full px-4 py-3 hover:bg-red-50 flex items-center gap-3 text-sm font-bold text-red-600"
+                      >
+                        <span className="material-symbols-outlined text-[18px]">delete</span> Delete Record
+                      </button>
+                    </div>
+                  )}
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+
+  const renderCurrentView = () => {
+    switch(activeTab) {
+      case 'MENU': return renderMenu();
+      case 'INVENTORY': return renderInventory();
+      case 'OPERATIONS': return renderOperations();
+      default: return (
+        <div className="flex flex-col items-center justify-center p-20 text-gray-300">
+          <span className="material-symbols-outlined text-8xl mb-4 opacity-20">construction</span>
+          <h4 className="text-xl font-black uppercase tracking-widest">{activeTab} IN PROGRESS</h4>
+        </div>
+      );
+    }
+  };
+
+  return (
+    <div className="flex h-screen w-full overflow-hidden bg-bg-light">
+      <aside className="w-72 flex-shrink-0 bg-burgundy flex flex-col shadow-2xl z-[60]">
+        <div className="h-24 flex items-center gap-3 px-8 border-b border-white/10">
+          <div className="bg-white/20 rounded-xl size-10 flex items-center justify-center ring-2 ring-white/10">
+            <span className="material-symbols-outlined text-white text-2xl">restaurant</span>
+          </div>
+          <div className="flex flex-col">
+            <h1 className="text-white text-xl font-black tracking-tighter uppercase leading-none">CulinaAdmin</h1>
+            <span className="text-[10px] text-white/40 font-black uppercase tracking-[0.2em] mt-1">PRO Terminal</span>
+          </div>
+        </div>
+        
+        <nav className="flex-1 py-10 px-4 flex flex-col gap-2">
+          {navItems.map((item) => (
+            <button
+              key={item.id}
+              onClick={() => setActiveTab(item.id as AdminTab)}
+              className={`flex items-center gap-4 px-5 py-4 rounded-2xl transition-all group ${
+                activeTab === item.id 
+                  ? 'bg-white/10 text-white shadow-lg ring-1 ring-white/20' 
+                  : 'text-white/60 hover:bg-white/5 hover:text-white'
+              }`}
+            >
+              <span className={`material-symbols-outlined ${activeTab === item.id ? 'fill' : ''}`}>
+                {item.icon}
+              </span>
+              <span className="font-black text-sm uppercase tracking-widest">{item.label}</span>
+              {activeTab === item.id && <div className="ml-auto size-1.5 rounded-full bg-cheese shadow-lg"></div>}
+            </button>
+          ))}
+        </nav>
+
+        <div className="p-6 border-t border-white/10 space-y-4">
+          <button 
+            onClick={store.logout} 
+            className="w-full flex items-center gap-4 px-5 py-4 text-white/50 hover:text-red-400 hover:bg-red-400/10 rounded-2xl transition-all text-sm font-black uppercase tracking-widest"
+          >
+            <span className="material-symbols-outlined">logout</span> Logout
+          </button>
+          <div className="flex items-center gap-4 p-4 rounded-3xl bg-white/5 border border-white/10">
+            <img src={store.user?.avatar} className="size-11 rounded-2xl ring-2 ring-cheese/20" alt="Admin" />
+            <div className="flex flex-col min-w-0">
+              <span className="text-sm font-black text-white truncate leading-none mb-1">{store.user?.fullName}</span>
+              <span className="text-[9px] text-cheese/60 uppercase font-black">Super Admin</span>
+            </div>
+          </div>
+        </div>
+      </aside>
+
+      <main className="flex-1 flex flex-col overflow-y-auto bg-gray-50/50">
+        <header className="h-24 flex items-center justify-between px-10 border-b border-gray-100 bg-white/80 backdrop-blur-md sticky top-0 z-[50]">
+          <div>
+            <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] mb-1">Culina / {activeTab}</p>
+            <h2 className="text-2xl font-black text-dark-gray uppercase tracking-tighter">
+              {navItems.find(n => n.id === activeTab)?.label}
+            </h2>
+          </div>
+          <div className="flex items-center gap-4">
+             <span className="text-[10px] font-black text-gray-500 bg-gray-100 px-4 py-2 rounded-full border border-gray-200 uppercase tracking-widest">
+               {new Date().toDateString()}
+             </span>
+          </div>
+        </header>
+
+        <div className="p-10">
+          {renderCurrentView()}
+        </div>
+      </main>
+
+      {/* MODALS */}
+
+      {/* Menu Modal */}
+      {isMenuModalOpen && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-lg rounded-3xl overflow-hidden shadow-2xl animate-in zoom-in duration-300">
+            <div className="p-8 border-b border-gray-100 flex justify-between items-center bg-gray-50">
+              <h3 className="text-xl font-black uppercase tracking-tight">{editingMenuItem ? 'Update Menu' : 'New Dish'}</h3>
+              <button onClick={() => setIsMenuModalOpen(false)} className="material-symbols-outlined">close</button>
+            </div>
+            <form onSubmit={handleMenuSubmit} className="p-8 space-y-4">
+              <div>
+                <label className="block text-xs font-black uppercase text-gray-400 mb-1">Dish Name</label>
+                <input name="name" defaultValue={editingMenuItem?.name} required className="w-full border-gray-200 rounded-xl" />
+              </div>
+              <div className="grid grid-cols-2 gap-4">
+                <div>
+                  <label className="block text-xs font-black uppercase text-gray-400 mb-1">Price ($)</label>
+                  <input name="price" type="number" step="0.01" defaultValue={editingMenuItem?.price} required className="w-full border-gray-200 rounded-xl" />
+                </div>
+                <div>
+                  <label className="block text-xs font-black uppercase text-gray-400 mb-1">Category</label>
+                  <select name="category" defaultValue={editingMenuItem?.category || 'Main Courses'} className="w-full border-gray-200 rounded-xl">
+                    <option>Main Courses</option>
+                    <option>Appetizers</option>
+                    <option>Desserts</option>
+                    <option>Drinks</option>
+                  </select>
+                </div>
+              </div>
+              <div>
+                <label className="block text-xs font-black uppercase text-gray-400 mb-1">Description</label>
+                <textarea name="description" defaultValue={editingMenuItem?.description} required className="w-full border-gray-200 rounded-xl min-h-[80px]" />
+              </div>
+              <button type="submit" className="w-full py-4 bg-burgundy text-white font-black uppercase tracking-widest rounded-2xl shadow-lg">
+                Confirm Changes
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Inventory Action Modals */}
+      {invModal.type && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-6 bg-black/60 backdrop-blur-sm">
+          <div className="bg-white w-full max-w-md rounded-3xl overflow-hidden shadow-2xl animate-in zoom-in duration-300">
+            <div className="p-6 border-b border-gray-100 flex justify-between items-center">
+              <h3 className="text-lg font-black uppercase tracking-tight">
+                {invModal.type === 'IMPORT' ? 'Import Stock' : invModal.type === 'ADD' ? 'Add New Material' : 'Adjust Item Details'}
+              </h3>
+              <button onClick={() => setInvModal({ type: null, item: null })} className="material-symbols-outlined">close</button>
+            </div>
+            <form onSubmit={handleInventoryAction} className="p-8 space-y-6">
+               {invModal.type === 'IMPORT' ? (
+                 <div className="space-y-4">
+                   <p className="text-gray-500 text-sm">Add stock for <strong>{invModal.item?.name}</strong>.</p>
+                   <div>
+                     <label className="block text-[10px] font-black uppercase text-gray-400 mb-1">Amount to Add ({invModal.item?.unit})</label>
+                     <input name="amount" type="number" step="0.1" required className="w-full border-gray-200 rounded-xl text-lg font-bold" autoFocus />
+                   </div>
+                 </div>
+               ) : (
+                 <div className="space-y-4">
+                    <div>
+                      <label className="block text-[10px] font-black uppercase text-gray-400 mb-1">Material Name</label>
+                      <input name="name" defaultValue={invModal.item?.name || ''} required className="w-full border-gray-200 rounded-xl" />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-[10px] font-black uppercase text-gray-400 mb-1">Category</label>
+                        <input name="category" defaultValue={invModal.item?.category || ''} required className="w-full border-gray-200 rounded-xl" />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-black uppercase text-gray-400 mb-1">Unit (kg, L, units)</label>
+                        <input name="unit" defaultValue={invModal.item?.unit || ''} required className="w-full border-gray-200 rounded-xl" />
+                      </div>
+                    </div>
+                    {invModal.type === 'ADD' && (
+                      <div>
+                        <label className="block text-[10px] font-black uppercase text-gray-400 mb-1">Initial Stock Level</label>
+                        <input name="stock" type="number" step="0.1" required className="w-full border-gray-200 rounded-xl text-lg font-bold" />
+                      </div>
+                    )}
+                 </div>
+               )}
+               <button type="submit" className="w-full py-4 bg-burgundy text-white font-black uppercase tracking-widest rounded-2xl shadow-lg">
+                 Confirm
+               </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* Manual Order UI */}
+      {isManualOrderOpen && (
+        <div className="fixed inset-0 z-[200] flex bg-white animate-in slide-in-from-bottom duration-500 overflow-hidden">
+          <div className="w-1/3 border-r border-gray-200 flex flex-col bg-gray-50">
+            <div className="p-8 border-b border-gray-200 flex justify-between items-center bg-white">
+              <h3 className="text-2xl font-black uppercase tracking-tight">Direct Ordering</h3>
+              <button onClick={() => setIsManualOrderOpen(false)} className="material-symbols-outlined">close</button>
+            </div>
+            <div className="p-8 space-y-4">
+                <label className="block text-xs font-black uppercase text-gray-400 mb-2 tracking-widest">Assign Table</label>
+                <div className="grid grid-cols-4 gap-2">
+                  {store.tables.map((t: any) => (
+                    <button 
+                      key={t.id} 
+                      onClick={() => setSelectedTable(t.id)}
+                      className={`h-12 rounded-xl font-bold transition-all ${selectedTable === t.id ? 'bg-burgundy text-white shadow-lg' : 'bg-white text-gray-400 border border-gray-200'}`}
+                    >
+                      {t.id}
+                    </button>
+                  ))}
+                </div>
+            </div>
+            <div className="flex-1 overflow-y-auto p-8 space-y-4">
+              <h4 className="text-[10px] font-black uppercase text-gray-400 tracking-widest">Cart Summary</h4>
+              {manualCart.length === 0 ? (
+                <div className="h-40 border-2 border-dashed border-gray-200 rounded-2xl flex items-center justify-center text-gray-300 font-bold uppercase text-xs">Empty</div>
+              ) : (
+                manualCart.map(i => (
+                  <div key={i.id} className="bg-white p-4 rounded-xl border border-gray-200 flex justify-between items-center shadow-sm">
+                    <div>
+                      <p className="font-bold text-dark-gray">{i.name}</p>
+                      <p className="text-xs text-gray-500">{i.quantity} x ${i.price}</p>
+                    </div>
+                    <button onClick={() => setManualCart(prev => prev.filter(item => item.id !== i.id))} className="text-red-600 hover:bg-red-50 p-2 rounded-lg">
+                      <span className="material-symbols-outlined">delete</span>
+                    </button>
+                  </div>
+                ))
+              )}
+            </div>
+            <div className="p-8 bg-white border-t border-gray-200">
+               <div className="flex justify-between items-end mb-6">
+                 <p className="text-xs font-black uppercase text-gray-400">Total Due</p>
+                 <p className="text-4xl font-black text-burgundy">${manualCart.reduce((acc, i) => acc + (i.price * i.quantity), 0).toFixed(2)}</p>
+               </div>
+               <button onClick={submitManualOrder} className="w-full py-5 bg-cheese text-white font-black uppercase tracking-widest rounded-2xl shadow-xl shadow-cheese/20">
+                 Send Order
+               </button>
+            </div>
+          </div>
+          <div className="flex-1 flex flex-col p-10 overflow-y-auto">
+            <h3 className="text-3xl font-black text-dark-gray uppercase tracking-tighter mb-8">Menu Selection</h3>
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {store.menu.map((item: MenuItem) => (
+                <button 
+                  key={item.id}
+                  onClick={() => item.available && addToManualCart(item)}
+                  className={`bg-white border-2 p-4 rounded-3xl text-left transition-all hover:border-burgundy shadow-sm flex gap-4 ${!item.available ? 'opacity-40 cursor-not-allowed' : 'hover:-translate-y-1'}`}
+                >
+                  <div className="size-16 rounded-2xl bg-cover shrink-0" style={{ backgroundImage: `url(${item.image})` }}></div>
+                  <div>
+                    <p className="font-bold text-md leading-tight">{item.name}</p>
+                    <p className="text-burgundy font-black text-sm">${item.price}</p>
+                  </div>
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+};
+
+export default AdminDashboard;
