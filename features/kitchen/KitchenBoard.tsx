@@ -2,7 +2,10 @@
 import React from 'react';
 import { OrderStatus, Order } from '../../types';
 
+type KitchenTab = 'ACTIVE' | 'HISTORY' | 'INVENTORY';
+
 const KitchenBoard: React.FC<{ store: any }> = ({ store }) => {
+  const [activeTab, setActiveTab] = React.useState<KitchenTab>('ACTIVE');
   const newOrders = store.orders.filter((o: Order) => o.status === OrderStatus.PENDING);
   const preparingOrders = store.orders.filter((o: Order) => o.status === OrderStatus.COOKING);
   const readyOrders = store.orders.filter((o: Order) => o.status === OrderStatus.READY);
@@ -19,9 +22,41 @@ const KitchenBoard: React.FC<{ store: any }> = ({ store }) => {
             </div>
           </div>
           <nav className="space-y-2">
-            <button className="w-full flex items-center gap-3 px-4 py-3 bg-white/10 rounded-xl border border-white/10 font-bold"><span className="material-symbols-outlined text-cheese">view_kanban</span>Active Orders</button>
-            <button className="w-full flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-white transition-all font-semibold"><span className="material-symbols-outlined">history</span>History</button>
-            <button className="w-full flex items-center gap-3 px-4 py-3 text-gray-400 hover:text-white transition-all font-semibold"><span className="material-symbols-outlined">inventory</span>Inventory</button>
+            <button
+  onClick={() => setActiveTab('ACTIVE')}
+  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl border font-bold
+    ${activeTab === 'ACTIVE'
+      ? 'bg-white/10 border-white/10 text-white'
+      : 'text-gray-400 hover:text-white'}
+  `}
+>
+  <span className="material-symbols-outlined text-cheese">view_kanban</span>
+  Active Orders
+</button>
+            <button
+  onClick={() => setActiveTab('HISTORY')}
+  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-semibold
+    ${activeTab === 'HISTORY'
+      ? 'bg-white/10 text-white'
+      : 'text-gray-400 hover:text-white'}
+  `}
+>
+  <span className="material-symbols-outlined">history</span>
+  History
+</button>
+
+            <button
+  onClick={() => setActiveTab('INVENTORY')}
+  className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-semibold
+    ${activeTab === 'INVENTORY'
+      ? 'bg-white/10 text-white'
+      : 'text-gray-400 hover:text-white'}
+  `}
+>
+  <span className="material-symbols-outlined">inventory</span>
+  Inventory
+</button>
+
           </nav>
         </div>
         <div className="p-6">
@@ -54,6 +89,8 @@ const KitchenBoard: React.FC<{ store: any }> = ({ store }) => {
         </header>
 
         <main className="flex-1 flex overflow-x-auto p-8 gap-8 bg-[#1A1A1A]">
+            {activeTab === 'ACTIVE' && (
+        <>
           {/* New Orders */}
           <div className="flex flex-col min-w-[380px] w-1/3 gap-6">
             <div className="bg-slate-900 rounded-2xl p-4 border border-white/10 flex items-center justify-between">
@@ -92,7 +129,25 @@ const KitchenBoard: React.FC<{ store: any }> = ({ store }) => {
                 <div key={o.id} className="bg-slate-800 border-2 border-cheese rounded-2xl overflow-hidden flex flex-col shadow-2xl">
                   <div className="p-5 bg-slate-900 flex justify-between">
                     <div><h3 className="text-3xl font-black text-cheese">Table {o.tableId}</h3><p className="text-[10px] text-gray-500 uppercase mt-1">Ticket #{o.id}</p></div>
-                    <span className="material-symbols-outlined text-cheese animate-spin">sync</span>
+                   <svg
+                    className="animate-spin h-6 w-6 text-cheese"
+                    viewBox="0 0 24 24"
+                    fill="none"
+                  >
+                    <circle
+                      className="opacity-25"
+                      cx="12"
+                      cy="12"
+                      r="10"
+                      stroke="currentColor"
+                      strokeWidth="4"
+                    />
+                    <path
+                      className="opacity-75"
+                      fill="currentColor"
+                      d="M4 12a8 8 0 018-8v4a4 4 0 00-4 4H4z"
+                    />
+                  </svg>
                   </div>
                   <div className="p-6 space-y-4">
                     {o.items.map(i => (
@@ -128,7 +183,18 @@ const KitchenBoard: React.FC<{ store: any }> = ({ store }) => {
               ))}
             </div>
           </div>
-        </main>
+            {activeTab === 'HISTORY' && (
+              <div className="text-gray-400 font-bold text-xl">
+                Order History (Coming soon)
+              </div>
+            )}
+
+            {activeTab === 'INVENTORY' && (
+              <div className="text-gray-400 font-bold text-xl">
+                Inventory Management (Coming soon)
+              </div>
+              )}</>
+            )}</main>
       </div>
     </div>
   );

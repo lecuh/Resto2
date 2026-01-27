@@ -11,12 +11,19 @@ import CustomerMenu from './features/customer/CustomerMenu';
 
 const App: React.FC = () => {
   const store = useAppStore();
+  const tableFromQR = new URLSearchParams(window.location.search).get('table');//fix table từ qr
 
   const renderedContent = useMemo(() => {
     if (!store.user) {
       return <Login onLogin={store.login} />;
     }
 
+    if (
+      store.user.role === UserRole.CUSTOMER &&
+      window.location.pathname.startsWith('/admin')
+    ) {
+      store.logout();
+    }
     switch (store.user.role) {
       case UserRole.ADMIN:
         return <AdminDashboard store={store} />;
@@ -29,15 +36,15 @@ const App: React.FC = () => {
       case UserRole.CUSTOMER:
         return <CustomerMenu store={store} />;
       default:
-        return <Login onLogin={store.login} />;
+        return null;
     }
   }, [store.user, store.orders, store.menu, store.tables]);
 
-  return (
-    <div className="min-h-screen bg-light-gray">
-      {renderedContent}
-    </div>
-  );
+return (
+  <div className="min-h-screen bg-light-gray" key={store.user?.id ?? 'guest'}>
+    {renderedContent}
+  </div>
+);
 };
 
 export default App;

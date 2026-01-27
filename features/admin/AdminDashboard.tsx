@@ -2,7 +2,13 @@
 import React, { useState } from 'react';
 import { MenuItem, OrderStatus, InventoryItem, OrderItem } from '../../types';
 
-type AdminTab = 'OPERATIONS' | 'MENU' | 'INVENTORY' | 'REPORTS' | 'STAFF';
+type AdminTab =
+  | 'DASHBOARD'
+  | 'MENU'
+  | 'INVENTORY'
+  | 'REPORTS'
+  | 'STAFF'
+  | 'VOUCHER';
 
 interface InventoryModalState {
   type: 'IMPORT' | 'ADJUST' | 'ADD' | null;
@@ -10,7 +16,7 @@ interface InventoryModalState {
 }
 
 const AdminDashboard: React.FC<{ store: any }> = ({ store }) => {
-  const [activeTab, setActiveTab] = useState<AdminTab>('OPERATIONS');
+  const [activeTab, setActiveTab] = useState<AdminTab>('DASHBOARD');
   
   // UI States
   const [menuSearch, setMenuSearch] = useState('');
@@ -28,14 +34,41 @@ const AdminDashboard: React.FC<{ store: any }> = ({ store }) => {
   const [isManualOrderOpen, setIsManualOrderOpen] = useState(false);
   const [manualCart, setManualCart] = useState<OrderItem[]>([]);
   const [selectedTable, setSelectedTable] = useState('1');
+  // ================= MOCK DATA FOR DEMO =================
 
-  const navItems = [
-    { id: 'OPERATIONS', label: 'Dashboard', icon: 'dashboard' },
-    { id: 'MENU', label: 'Menu', icon: 'menu_book' },
-    { id: 'INVENTORY', label: 'Inventory', icon: 'inventory' },
-    { id: 'REPORTS', label: 'Reports', icon: 'analytics' },
-    { id: 'STAFF', label: 'Staff', icon: 'group' },
+  const mockStaffs = [
+    { id: 's1', name: 'Admin Root', role: 'ADMIN', active: true },
+    { id: 's2', name: 'Manager Anna', role: 'MANAGER', active: true },
+    { id: 's3', name: 'Cashier Tom', role: 'CASHIER', active: true },
+    { id: 's4', name: 'Waiter John', role: 'WAITER', active: false },
   ];
+
+  const mockVouchers = [
+    // PEOPLE
+    { id: 'v1', type: 'PEOPLE', name: 'Group 10+', value: '5%', active: true },
+    { id: 'v2', type: 'PEOPLE', name: 'Group 20+', value: '10–15%', active: true },
+
+    // BILL
+    { id: 'v3', type: 'BILL', name: 'Bill ≥ 300k', value: '-30,000đ', active: true },
+    { id: 'v4', type: 'BILL', name: 'Bill ≥ 700k', value: '-50,000đ', active: true },
+    { id: 'v5', type: 'BILL', name: 'Bill ≥ 1.5M', value: '-100,000đ', active: false },
+
+    // FOOD
+    { id: 'v6', type: 'FOOD', name: 'Manager Choice', value: '5–50%', active: true },
+  ];
+  const [staffList, setStaffList] = useState(mockStaffs);
+  const [voucherList, setVoucherList] = useState(mockVouchers);
+
+
+
+const navItems = [
+  { id: 'DASHBOARD', label: 'Dashboard', icon: 'dashboard' },
+  { id: 'MENU', label: 'Menu', icon: 'menu_book' },
+  { id: 'INVENTORY', label: 'Inventory', icon: 'inventory' },
+  { id: 'REPORTS', label: 'Reports', icon: 'analytics' },
+  { id: 'STAFF', label: 'Staff', icon: 'group' },
+  { id: 'VOUCHER', label: 'Voucher', icon: 'confirmation_number' },
+];
 
   // Manual Ordering Logic
   const addToManualCart = (item: MenuItem) => {
@@ -125,7 +158,7 @@ const AdminDashboard: React.FC<{ store: any }> = ({ store }) => {
     setInvModal({ type: null, item: null });
   };
 
-  const renderOperations = () => (
+  const renderDashboard = () => (
     <div className="space-y-8 animate-in fade-in duration-500">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <div className="bg-white border border-gray-100 p-6 rounded-2xl shadow-sm">
@@ -159,7 +192,14 @@ const AdminDashboard: React.FC<{ store: any }> = ({ store }) => {
           <h3 className="text-2xl font-extrabold text-dark-gray mt-1">18m</h3>
         </div>
       </div>
-
+      <div className="bg-white border rounded-2xl shadow-sm">
+        <div className="p-6 border-b">
+            <h3 className="font-black text-lg">Recent Orders</h3>
+          </div>
+            <div className="p-6">
+                {renderOrders()}
+            </div>
+      </div>
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
         <div className="xl:col-span-2 space-y-8">
           <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
@@ -208,7 +248,96 @@ const AdminDashboard: React.FC<{ store: any }> = ({ store }) => {
       </div>
     </div>
   );
+  const nextStatus = (status: OrderStatus) => {
+  switch (status) {
+    case OrderStatus.PENDING: return OrderStatus.COOKING;
+    case OrderStatus.COOKING: return OrderStatus.READY;
+    case OrderStatus.READY: return OrderStatus.SERVED;
+    default: return status;
+  }
+  };
+// Order UI helpers
+const getStatusBadgeClass = (status: OrderStatus) => {
+  switch (status) {
+    case OrderStatus.PENDING:
+      return 'bg-gray-100 text-gray-700';
+    case OrderStatus.COOKING:
+      return 'bg-orange-100 text-orange-700';
+    case OrderStatus.READY:
+      return 'bg-olive-100 text-olive-700';
+    case OrderStatus.SERVED:
+      return 'bg-green-100 text-green-700';
+    default:
+      return 'bg-gray-100 text-gray-700';
+  }
+};
+const renderOrders = () => (
+  <div className="bg-white border border-gray-100 rounded-2xl shadow-sm overflow-hidden">
+    <table className="w-full table-fixed">
+      <thead className="bg-gray-50 text-[11px] font-black uppercase text-gray-400">
+        <tr>
+          <th className="px-6 py-4 w-[12%] text-left">Order ID</th>
+          <th className="px-6 py-4 w-[12%] text-left">Table</th>
+          <th className="px-6 py-4 w-[14%] text-left">Items</th>
+          <th className="px-6 py-4 w-[14%] text-left">Total</th>
+          <th className="px-6 py-4 w-[16%] text-center">Status</th>
+          <th className="px-6 py-4 w-[16%] text-center">Action</th>
+        </tr>
+      </thead>
 
+      <tbody>
+        {store.orders.map((order: any) => (
+          <tr key={order.id} className="border-t last:border-b">
+            <td className="px-6 py-4 font-mono text-sm">
+              #{order.id}
+            </td>
+
+            <td className="px-6 py-4 font-bold">
+              Table {order.tableId}
+            </td>
+
+            <td className="px-6 py-4 text-sm text-gray-600">
+              {order.items.length} items
+            </td>
+
+            <td className="px-6 py-4 font-black text-burgundy">
+              ${order.total.toFixed(2)}
+            </td>
+
+            <td className="px-6 py-4 text-center">
+              <span
+                className={`inline-flex px-3 py-1 rounded-full text-xs font-black uppercase
+                  ${getStatusBadgeClass(order.status)}`}
+              >
+                {order.status}
+              </span>
+            </td>
+
+            <td className="px-6 py-4 text-center">
+              <button
+                disabled={order.status === OrderStatus.SERVED}
+                onClick={() =>
+                  store.updateOrderStatus(
+                    order.id,
+                    nextStatus(order.status)
+                  )
+                }
+                className={`min-w-[90px] px-4 py-2 rounded-lg text-xs font-black transition
+                  ${
+                    order.status === OrderStatus.SERVED
+                      ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                      : 'bg-olive text-white hover:bg-olive/90'
+                  }`}
+              >
+                {order.status === OrderStatus.SERVED ? 'Done' : 'Advance'}
+              </button>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+);
   const renderMenu = () => (
     <div className="animate-in fade-in duration-500">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 gap-4">
@@ -373,20 +502,171 @@ const AdminDashboard: React.FC<{ store: any }> = ({ store }) => {
       </div>
     </div>
   );
+  //update khi có BE
+const renderStaff = () => (
+  <div className="bg-white rounded-2xl shadow-sm p-8 animate-in fade-in">
+    <h3 className="text-2xl font-black uppercase mb-6">Staff Management</h3>
 
-  const renderCurrentView = () => {
-    switch(activeTab) {
-      case 'MENU': return renderMenu();
-      case 'INVENTORY': return renderInventory();
-      case 'OPERATIONS': return renderOperations();
-      default: return (
-        <div className="flex flex-col items-center justify-center p-20 text-gray-300">
-          <span className="material-symbols-outlined text-8xl mb-4 opacity-20">construction</span>
-          <h4 className="text-xl font-black uppercase tracking-widest">{activeTab} IN PROGRESS</h4>
-        </div>
-      );
-    }
-  };
+    <table className="w-full border-collapse">
+      <thead className="text-xs uppercase text-gray-400 font-black">
+        <tr>
+          <th className="text-left pb-4 px-2">Name</th>
+          <th className="text-left pb-4 px-2">Role</th>
+          <th className="text-center pb-4 px-2">Status</th>
+          <th className="text-right pb-4 px-2">Action</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        {staffList.map(s => (
+          <tr key={s.id} className="border-t hover:bg-gray-50 transition-colors">
+            <td className="py-4 px-2 font-bold text-gray-800">{s.name}</td>
+
+            <td className="py-4 px-2">
+              <select
+                value={s.role}
+                onChange={e => updateStaffRole(s.id, e.target.value)}
+                className="border rounded-lg px-3 py-1.5 text-sm font-medium text-gray-700 bg-white cursor-pointer outline-none focus:ring-2 focus:ring-gray-200 transition-all"
+              >
+                <option value="Admin">Admin</option>
+                <option value="Manager">Manager</option>
+                <option value="Cashier">Cashier</option>
+                <option value="Waiter">Waiter</option>
+                <option value="Kitchen">Kitchen</option>
+              </select>
+            </td>
+
+            <td className="py-4 px-2 text-center">
+              <span
+                className={`inline-block px-3 py-1 rounded-full text-[10px] font-black tracking-wider ${
+                  s.active ? 'bg-green-100 text-green-600' : 'bg-gray-100 text-gray-400'
+                }`}
+              >
+                {s.active ? 'ACTIVE' : 'DISABLED'}
+              </span>
+            </td>
+
+            <td className="py-4 px-2 text-right">
+              <button
+                onClick={() => toggleStaffStatus(s.id)}
+                className={`font-bold text-sm transition-colors ${
+                  s.active ? 'text-red-600 hover:text-red-800' : 'text-green-600 hover:text-green-800'
+                }`}
+              >
+                {s.active ? 'Disable' : 'Enable'}
+              </button>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+);
+const updateStaffRole = (id: string, role: string) => {
+  setStaffList(prev =>
+    prev.map(s => (s.id === id ? { ...s, role } : s))
+  );
+};
+const toggleStaffStatus = (id: string) => {
+  setStaffList(prev =>
+    prev.map(s => (s.id === id ? { ...s, active: !s.active } : s))
+  );
+};
+
+const renderVoucher = () => (
+  <div className="bg-white rounded-2xl shadow-sm p-8 animate-in fade-in">
+    <h3 className="text-2xl font-black uppercase mb-6">Voucher Management</h3>
+
+    <table className="w-full border-collapse">
+      <thead className="text-xs uppercase text-gray-400 font-black">
+        <tr>
+          <th className="text-left pb-4 px-2">Name</th>
+          <th className="text-left pb-4 px-2">Type</th>
+          <th className="text-center pb-4 px-2">Value</th>
+          <th className="text-center pb-4 px-2">Status</th>
+          <th className="text-right pb-4 px-2">Action</th>
+        </tr>
+      </thead>
+
+      <tbody>
+        {voucherList.map(v => (
+          <tr key={v.id} className="border-t hover:bg-gray-50 transition-colors">
+            <td className="py-4 px-2 font-bold text-gray-800">{v.name}</td>
+            
+            <td className="py-4 px-2 text-gray-600">
+              <span className="bg-gray-100 px-2 py-1 rounded text-xs">
+                {v.type}
+              </span>
+            </td>
+
+            <td className="py-4 px-2 text-center font-mono font-bold text-gray-700">
+              {v.value}
+            </td>
+
+            <td className="py-4 px-2 text-center">
+              <span
+                className={`inline-block px-3 py-1 rounded-full text-[10px] font-black tracking-wider ${
+                  v.active 
+                    ? 'bg-green-100 text-green-600'
+                    : 'bg-gray-100 text-gray-400'
+                }`}
+              >
+                {v.active ? 'ACTIVE' : 'INACTIVE'}
+              </span>
+            </td>
+
+            <td className="py-4 px-2 text-right">
+              <button
+                onClick={() => toggleVoucher(v.id)}
+                className={`text-sm font-bold transition-colors ${
+                  v.active ? 'text-red-600 hover:text-red-800' : 'text-green-600 hover:text-green-800'
+                }`}
+              >
+                {v.active ? 'Disable' : 'Enable'}
+              </button>
+            </td>
+          </tr>
+        ))}
+      </tbody>
+    </table>
+  </div>
+);
+const toggleVoucher = (id: string) => {
+  setVoucherList(prev =>
+    prev.map(v => (v.id === id ? { ...v, active: !v.active } : v))
+  );
+};
+
+      const renderReports = () => (
+  <div className="space-y-8 animate-in fade-in">
+    <div className="bg-white rounded-2xl p-6 shadow-sm">
+      <h4 className="font-black mb-4">Monthly Revenue</h4>
+      <div className="h-64 bg-gray-50 rounded-xl" />
+    </div>
+
+    <div className="bg-white rounded-2xl p-6 shadow-sm">
+      <h4 className="font-black mb-4">Inventory Cost</h4>
+      <div className="h-48 bg-gray-50 rounded-xl" />
+    </div>
+
+    <div className="bg-white rounded-2xl p-6 shadow-sm">
+      <h4 className="font-black mb-4">Staff Salary</h4>
+      <div className="h-48 bg-gray-50 rounded-xl" />
+    </div>
+  </div>
+);
+
+const renderCurrentView = () => {
+  switch (activeTab) {
+    case 'DASHBOARD': return renderDashboard();
+    case 'MENU': return renderMenu();
+    case 'INVENTORY': return renderInventory();
+    case 'REPORTS': return renderReports();
+    case 'STAFF': return renderStaff();
+    case 'VOUCHER': return renderVoucher();
+    default: return null;
+  }
+};
 
   return (
     <div className="flex h-screen w-full overflow-hidden bg-bg-light">
